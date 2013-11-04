@@ -454,7 +454,7 @@ public class TabletStatusBar extends StatusBar implements
         mStatusBarView = sb;
 
         sb.setHandler(mHandler);
-
+/*
         try {
             // Sanity-check that someone hasn't set up the config wrong and asked for a navigation
             // bar on a tablet that has only the system bar
@@ -464,7 +464,7 @@ public class TabletStatusBar extends StatusBar implements
             }
         } catch (RemoteException ex) {
         }
-
+*/
         mBarContents = (ViewGroup) sb.findViewById(R.id.bar_contents);
 
         // the whole right-hand side of the bar
