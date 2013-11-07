@@ -78,6 +78,7 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
 
     private boolean mStackConnected;
     private boolean mHWConnected;
+    private boolean mPHYConnected;
     private boolean mInterfaceStopped;
     private DhcpHandler mDhcpTarget;
     private String mInterfaceName ;
@@ -178,7 +179,6 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
 
             mDhcpTarget.sendEmptyMessage(EVENT_DHCP_START);
         } else {
-
 		int event;
 		DhcpInfo tempDhcpInfo = new DhcpInfo();
 		tempDhcpInfo.ipAddress =  stringToIpAddr(info.getIpAddress());
@@ -190,12 +190,13 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
 		NetworkUtils.removeDefaultRoute(info.getIfName());
 		if (NetworkUtils.configureInterface(info.getIfName(), tempDhcpInfo)) {
 			event = EVENT_INTERFACE_CONFIGURATION_SUCCEEDED;
-				Log.v(TAG, "Static IP configuration succeeded");
-			} else {
-				event = EVENT_INTERFACE_CONFIGURATION_FAILED;
-				Log.v(TAG, "Static IP configuration failed");
-			}
-			this.sendEmptyMessage(event);
+			Log.v(TAG, "Static IP configuration succeeded");
+		} else {
+			event = EVENT_INTERFACE_CONFIGURATION_FAILED;
+			Log.v(TAG, "Static IP configuration failed");
+		}
+		this.sendEmptyMessage(event);
+		mStartingDhcp = false;
         }
         return true;
     }
@@ -347,9 +348,9 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
         synchronized (this) {
             switch (msg.what) {
             case EVENT_INTERFACE_CONFIGURATION_SUCCEEDED:
-                if (localLOGV) Slog.i(TAG, "received configured succeeded, stack=" + mStackConnected + " HW=" + mHWConnected);
+                if (localLOGV) Slog.i(TAG, "received configured succeeded, stack=" + mStackConnected + " HW=" + mHWConnected + " PHY=" + mPHYConnected);
                 mStackConnected = true;
-                if (mHWConnected)
+                if (mPHYConnected)
                     setState(true, msg.what);
                 break;
             case EVENT_INTERFACE_CONFIGURATION_FAILED:
@@ -359,15 +360,19 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
             case EVENT_HW_CONNECTED:
                 if (localLOGV) Slog.i(TAG, "received HW connected, stack=" + mStackConnected + " HW=" + mHWConnected);
                 mHWConnected = true;
-                if (mStackConnected)
+                if (mStackConnected && mPHYConnected)
                     setState(true, msg.what);
                 break;
             case EVENT_HW_DISCONNECTED:
                 if (localLOGV) Slog.i(TAG, "received disconnected events, stack=" + mStackConnected + " HW=" + mHWConnected);
+		mPHYConnected = false;
                 setState(mHWConnected = false, msg.what);
                 break;
             case EVENT_HW_PHYCONNECTED:
                 if (localLOGV) Slog.i(TAG, "interface up event, kick off connection request");
+
+		mPHYConnected = true;
+
                 if (!mStartingDhcp) {
                     int state = mEM.getState();
                     if (state != mEM.ETHERNET_STATE_DISABLED) {
